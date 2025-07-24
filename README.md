@@ -2,7 +2,7 @@
 
 A modern sales shortlist application with persistent file storage, built with HTML, JavaScript, and deployed on Vercel with Upstash Redis and Vercel Blob Storage.
 
-## Features
+## Features 
 
 - **Persistent File Storage**: Upload Excel/CSV files that persist across all users and sessions
 - **Multiple File Format Support**: .xlsx, .xls, and .csv files up to 10MB each
