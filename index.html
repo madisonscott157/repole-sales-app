@@ -964,6 +964,28 @@
         </div>
     </div>
 
+    <!-- Admin Access Modal -->
+    <div class="modal fade" id="adminModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Admin Access</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Enter admin PIN to access administrative features:</p>
+                    <div class="mb-3">
+                        <label for="adminPin" class="form-label">PIN</label>
+                        <input type="password" class="form-control" id="adminPin" placeholder="Enter PIN" maxlength="4">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="submitPinBtn">Access Admin</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Admin Panel Modal -->
     <div class="modal fade" id="adminPanelModal" tabindex="-1">
@@ -1100,12 +1122,12 @@
                     }
                 });
 
-                // Admin functionality  
-                document.getElementById('verifyPinBtn').addEventListener('click', () => this.checkAdminPin());
+                // Admin functionality
+                document.getElementById('verifyPinBtn').addEventListener('click', () => this.verifyPin());
                 document.getElementById('exitAdminBtn').addEventListener('click', () => this.exitAdminMode());
                 document.getElementById('adminPin').addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') {
-                        this.checkAdminPin();
+                        this.verifyPin();
                     }
                 });
 
@@ -2885,6 +2907,18 @@
                 modal.show();
             }
 
+            verifyPin() {
+                const enteredPin = document.getElementById('adminPin').value;
+                if (enteredPin === this.ADMIN_PIN) {
+                    this.isAdmin = true;
+                    this.startAdminSession();
+                    bootstrap.Modal.getInstance(document.getElementById('pinModal')).hide();
+                    this.showAdminPanel();
+                } else {
+                    document.getElementById('pinError').style.display = 'block';
+                    document.getElementById('adminPin').value = '';
+                }
+            }
 
             startAdminSession() {
                 // Clear any existing timeout
@@ -3073,7 +3107,7 @@
 
             showPinModal() {
                 document.getElementById('adminPin').value = '';
-                const modal = new bootstrap.Modal(document.getElementById('pinModal'));
+                const modal = new bootstrap.Modal(document.getElementById('adminModal'));
                 modal.show();
             }
 
@@ -3082,7 +3116,7 @@
                 if (enteredPin === this.ADMIN_PIN) {
                     this.isAdmin = true;
                     this.startAdminSession();
-                    bootstrap.Modal.getInstance(document.getElementById('pinModal')).hide();
+                    bootstrap.Modal.getInstance(document.getElementById('adminModal')).hide();
                     this.showAdminPanel();
                     this.updateAdminButtonVisibility();
                 } else {
