@@ -852,6 +852,7 @@
                                     <div class="d-flex gap-1">
                                         <button class="btn btn-sm btn-outline-primary" id="moveLeftBtn">← Left</button>
                                         <button class="btn btn-sm btn-outline-primary" id="moveRightBtn">Right →</button>
+                                        <button class="btn btn-sm admin-only" id="deleteColumnBtn" style="display: none; border: 1px solid #ff6600; color: #ff6600; background: transparent;">Delete Column</button>
                                     </div>
                                 </div>
                             </div>
@@ -1079,7 +1080,30 @@
         </div>
     </div>
 
-
+    <!-- Delete Column Modal -->
+    <div class="modal fade" id="deleteColumnModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete Column</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Warning:</strong> This will permanently delete the selected column and all its data from all sales.</p>
+                    <div class="mb-3">
+                        <label for="deleteColumnSelect" class="form-label">Select column to delete:</label>
+                        <select class="form-select" id="deleteColumnSelect">
+                            <option value="">Choose a column...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteColumnBtn">Delete Column</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1241,6 +1265,8 @@
                 document.getElementById('clearFiltersBtn').addEventListener('click', () => this.clearAllFilters());
                 document.getElementById('moveLeftBtn').addEventListener('click', () => this.moveColumn('left'));
                 document.getElementById('moveRightBtn').addEventListener('click', () => this.moveColumn('right'));
+                document.getElementById('deleteColumnBtn').addEventListener('click', () => this.showDeleteColumnModal());
+                document.getElementById('confirmDeleteColumnBtn').addEventListener('click', () => this.deleteSelectedColumn());
 
                 // Column type change
                 document.getElementById('columnType').addEventListener('change', (e) => {
@@ -2456,6 +2482,111 @@
                 }
             }
 
+            showDeleteColumnModal() {
+                if (!this.isAdmin) {
+                    alert('Admin access required to delete columns.');
+                    return;
+                }
+
+                // Populate the dropdown with deletable columns
+                const select = document.getElementById('deleteColumnSelect');
+                select.innerHTML = '<option value="">Choose a column...</option>';
+
+                // Get all available columns (exclude basic horse info that shouldn't be deleted)
+                const protectedColumns = ['Hip', 'Name', 'Sire', 'Dam', 'Sex', 'YOB', 'Consignor'];
+                const allColumns = new Set();
+                
+                // Add columns from column order
+                this.columnOrder.forEach(col => {
+                    if (!protectedColumns.includes(col)) {
+                        allColumns.add(col);
+                    }
+                });
+                
+                // Add custom columns
+                this.customColumns.forEach(col => allColumns.add(col));
+                
+                // Add shortlist columns (file names)
+                this.files.forEach(file => allColumns.add(file.name));
+                
+                // Sort and add to dropdown
+                Array.from(allColumns).sort().forEach(col => {
+                    const option = document.createElement('option');
+                    option.value = col;
+                    option.textContent = col;
+                    select.appendChild(option);
+                });
+
+                // Show the modal
+                const modal = new bootstrap.Modal(document.getElementById('deleteColumnModal'));
+                modal.show();
+            }
+
+            deleteSelectedColumn() {
+                const columnToDelete = document.getElementById('deleteColumnSelect').value;
+                if (!columnToDelete) {
+                    alert('Please select a column to delete.');
+                    return;
+                }
+
+                if (!confirm(`Are you sure you want to permanently delete the "${columnToDelete}" column? This action cannot be undone and will affect all sales.`)) {
+                    return;
+                }
+
+                // Remove from custom columns if it's a custom column
+                this.customColumns = this.customColumns.filter(col => col !== columnToDelete);
+                
+                // Remove from column order
+                this.columnOrder = this.columnOrder.filter(col => col !== columnToDelete);
+                
+                // Remove from hidden columns
+                this.hiddenColumns.delete(columnToDelete);
+                
+                // Remove column data from all rows in current sale
+                this.combinedData.forEach(row => {
+                    delete row[columnToDelete];
+                });
+                
+                // If it's a file/shortlist column, remove the file
+                this.files = this.files.filter(file => file.name !== columnToDelete);
+                
+                // Remove the column from ALL sales in the system
+                for (const [saleId, saleInfo] of this.salesData.entries()) {
+                    if (saleInfo.data) {
+                        // Remove from custom columns
+                        if (saleInfo.data.customColumns) {
+                            saleInfo.data.customColumns = saleInfo.data.customColumns.filter(col => col !== columnToDelete);
+                        }
+                        
+                        // Remove from files
+                        if (saleInfo.data.files) {
+                            saleInfo.data.files = saleInfo.data.files.filter(file => file.name !== columnToDelete);
+                        }
+                        
+                        // Remove column data from all rows in this sale
+                        if (saleInfo.data.combinedData) {
+                            saleInfo.data.combinedData.forEach(row => {
+                                delete row[columnToDelete];
+                            });
+                        }
+                    }
+                }
+                
+                // Save user column preferences and all sales data
+                this.saveUserColumnPreferences();
+                this.autoSave();
+                this.saveSalesData(); // Save all sales to persist column deletion across all sales
+                
+                // Recreate table and controls
+                this.createTable();
+                this.setupColumnControls();
+                
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('deleteColumnModal')).hide();
+                
+                alert(`Column "${columnToDelete}" has been deleted successfully.`);
+            }
+
             cancelAllEdits() {
                 // Find all editing cells and cancel them immediately
                 $('.editing').each(function() {
@@ -3350,6 +3481,12 @@
                 const clearBtn = document.getElementById('clearBtn');
                 if (clearBtn) {
                     clearBtn.style.display = this.isAdmin ? 'inline-block' : 'none';
+                }
+                
+                // Show/hide Delete Column button based on admin status
+                const deleteColumnBtn = document.getElementById('deleteColumnBtn');
+                if (deleteColumnBtn) {
+                    deleteColumnBtn.style.display = this.isAdmin ? 'inline-block' : 'none';
                 }
             }
 
