@@ -1937,7 +1937,12 @@
                 let userId = localStorage.getItem('repole_user_id');
                 if (!userId) {
                     userId = 'user_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-                    localStorage.setItem('repole_user_id', userId);
+                    try {
+                        localStorage.setItem('repole_user_id', userId);
+                    } catch (error) {
+                        console.warn('Could not save user ID to localStorage:', error.message);
+                        // User ID still works in memory for this session
+                    }
                 }
                 return userId;
             }
@@ -2571,9 +2576,14 @@
                 
                 // Clear undo stack when switching sales - keeps it clean and prevents confusion
                 this.clearUndoStack();
-                
+
                 // Save current sale to localStorage for refresh persistence
-                localStorage.setItem('currentSaleId', selectedSaleId);
+                try {
+                    localStorage.setItem('currentSaleId', selectedSaleId);
+                } catch (error) {
+                    console.warn('Could not save current sale to localStorage:', error.message);
+                    // Sale still loads, just won't persist on refresh
+                }
                 
                 const loaded = await this.loadSaleDay(selectedSaleId);
 
@@ -2773,30 +2783,42 @@
                 try {
                     const now = Date.now();
                     const thirtyMinutes = 30 * 60 * 1000; // 30 minutes
-                    
+                    const sevenDays = 7 * 24 * 60 * 60 * 1000; // 7 days
+
                     const lastBackupKey = `repole_last_backup_time_${saleId}`;
                     const lastChangeKey = `repole_last_change_time_${saleId}`;
-                    
+
                     const lastBackupTime = parseInt(localStorage.getItem(lastBackupKey) || '0');
                     const lastChangeTime = parseInt(localStorage.getItem(lastChangeKey) || '0');
-                    
+
                     // Only create backup if:
-                    // 1. At least 30 minutes have passed since last backup, AND
-                    // 2. There have been changes since the last backup
+                    // 1. Sale has been edited in the last 7 days (active sales only)
+                    // 2. At least 30 minutes have passed since last backup, AND
+                    // 3. There have been changes since the last backup
+
+                    // Skip backup if sale hasn't been edited in 7 days
+                    if (lastChangeTime > 0 && now - lastChangeTime > sevenDays) {
+                        return; // Inactive sale - no backup needed
+                    }
+
                     if (now - lastBackupTime < thirtyMinutes) {
                         return; // Too soon since last backup
                     }
-                    
+
                     if (lastChangeTime <= lastBackupTime) {
                         return; // No changes since last backup
                     }
-                    
+
                     // Create the backup
                     this.createHourlyBackup(saleId, now);
-                    
+
                     // Update the last backup time
-                    localStorage.setItem(lastBackupKey, now.toString());
-                    
+                    try {
+                        localStorage.setItem(lastBackupKey, now.toString());
+                    } catch (storageError) {
+                        console.warn('Could not update backup time:', storageError.message);
+                    }
+
                 } catch (error) {
                     console.error('Error checking backup:', error);
                 }
@@ -5802,7 +5824,11 @@
                         const index = frozenSales.indexOf(saleId);
                         if (index > -1) {
                             frozenSales.splice(index, 1);
-                            localStorage.setItem('frozen_sales', JSON.stringify(frozenSales));
+                            try {
+                                localStorage.setItem('frozen_sales', JSON.stringify(frozenSales));
+                            } catch (error) {
+                                console.warn('Could not update frozen sales list:', error.message);
+                            }
                         }
                         
                         // If this was the current sale, reset
@@ -6523,8 +6549,13 @@
             
             if (enteredPin === '14066') {
                 // Correct PIN
-                localStorage.setItem('siteAccess', 'granted');
-                localStorage.setItem('siteTimestamp', Date.now().toString());
+                try {
+                    localStorage.setItem('siteAccess', 'granted');
+                    localStorage.setItem('siteTimestamp', Date.now().toString());
+                } catch (error) {
+                    console.warn('Could not save site access to localStorage:', error.message);
+                    // Still allow access for this session even if localStorage fails
+                }
                 document.getElementById('siteAccessModal').style.display = 'none';
                 pinError.style.display = 'none';
                 pinInput.value = '';
