@@ -165,24 +165,7 @@
                 max-width: 400px; /* Smaller than Vet's 1000px */
             }
         }
-
-        /* Notes column - similar to Scope but can be wider */
-        .excel-table td[data-column="Notes"] {
-            white-space: normal !important;
-            word-wrap: break-word !important;
-            max-width: 350px;
-            min-width: 120px;
-            line-height: 1.4;
-            padding: 8px 6px !important;
-        }
-
-        /* Desktop - allow Notes to expand more */
-        @media (min-width: 1025px) {
-            .excel-table td[data-column="Notes"] {
-                max-width: 500px;
-            }
-        }
-
+        
         .excel-table .horse-info {
             text-align: left;
             min-width: 120px;
@@ -5254,12 +5237,13 @@
                     sire: { priority: 2, preferredSize: 8 },
                     dam: { priority: 2, preferredSize: 8 },
                     consignor: { priority: 2, preferredSize: 7 },
-                    notes: { priority: 2, preferredSize: 12 },
+                    notes: { priority: 2, preferredSize: 7 },
                     vet: { priority: 3, preferredSize: 22 },
                     result: { priority: 3, preferredSize: 6 },
-                    scope: { priority: 2, preferredSize: 5 },
+                    scope: { priority: 2, preferredSize: 4 },
                     reserve: { priority: 2, preferredSize: 7 },
-                    overlap: { priority: 1, preferredSize: 4 }
+                    overlap: { priority: 1, preferredSize: 4 },
+                    notes: { priority: 2, preferredSize: 8 }
                 };
                 
                 // Categorize columns and calculate total preferred size
