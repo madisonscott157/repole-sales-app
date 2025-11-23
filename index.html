@@ -4177,14 +4177,29 @@
                         // Special handling for Hip range filtering
                         if (column === 'Hip' && filterValue.includes('-')) {
                             const [fromStr, toStr] = filterValue.split('-');
-                            const fromValue = parseInt(fromStr);
-                            const toValue = parseInt(toStr);
-                            const hipValue = parseInt(row[column]) || 0;
-                            
-                            if (fromValue && toValue && hipValue) {
-                                return hipValue >= fromValue && hipValue <= toValue;
+                            const fromValue = fromStr ? parseInt(fromStr) : null;
+                            const toValue = toStr ? parseInt(toStr) : null;
+                            const hipValue = parseInt(row[column]);
+
+                            // Skip invalid hip values
+                            if (isNaN(hipValue)) {
+                                return false;
                             }
-                            return false; // Invalid range or hip value
+
+                            // Handle partial ranges
+                            if (fromValue && toValue) {
+                                // Both values: range filter
+                                return hipValue >= fromValue && hipValue <= toValue;
+                            } else if (fromValue) {
+                                // Only from value: >= filter
+                                return hipValue >= fromValue;
+                            } else if (toValue) {
+                                // Only to value: <= filter
+                                return hipValue <= toValue;
+                            }
+
+                            // Neither value: show all
+                            return true;
                         }
                         
                         // Regular text filtering
@@ -4265,17 +4280,16 @@
                             // Hip range inputs
                             const fromInput = $(e.target).closest('div').find('.hip-range-from');
                             const toInput = $(e.target).closest('div').find('.hip-range-to');
-                            const fromValue = parseInt(fromInput.val()) || '';
-                            const toValue = parseInt(toInput.val()) || '';
-                            
-                            if (fromValue && toValue) {
+                            const fromValue = fromInput.val();
+                            const toValue = toInput.val();
+
+                            // Save partial range values (allows typing without losing focus)
+                            if (fromValue || toValue) {
                                 this.filters[column] = `${fromValue}-${toValue}`;
                                 // Update dropdown to show Range is selected
                                 $(e.target).closest('div').siblings('.hip-filter-select').val('__RANGE__');
-                            } else if (!fromValue && !toValue) {
-                                this.filters[column] = '';
                             } else {
-                                return; // Don't apply filter until both values are entered
+                                this.filters[column] = '';
                             }
                         }
                     } else {
