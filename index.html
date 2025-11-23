@@ -3996,9 +3996,9 @@
                     </th>`;
                 }).join('') + '<th class="text-center">Delete</th>';
                 
-                // Create filter row if visible
-                const filterRow = this.filtersVisible ? `
-                    <tr class="filter-row">
+                // Always create filter row but hide with CSS if not visible
+                const filterRow = `
+                    <tr class="filter-row" style="display: ${this.filtersVisible ? 'table-row' : 'none'};">
                         ${visibleColumns.map(col => `
                             <th>
                                 ${col === 'Vet' ? `
@@ -4008,7 +4008,7 @@
                                             <option value="__REMOVE_BLANKS__" ${this.filters[col] === '__REMOVE_BLANKS__' ? 'selected' : ''}>Remove blanks</option>
                                             <option value="__CUSTOM__" ${this.filters[col] && this.filters[col] !== '__REMOVE_BLANKS__' && this.filters[col] !== '' ? 'selected' : ''}>Custom</option>
                                         </select>
-                                        <input type="text" class="filter-input vet-custom-input" placeholder="Enter text to filter" 
+                                        <input type="text" class="filter-input vet-custom-input" placeholder="Enter text to filter"
                                                data-column="${col}" value="${this.filters[col] && this.filters[col] !== '__REMOVE_BLANKS__' && this.filters[col] !== '__CUSTOM__' ? this.filters[col] : ''}"
                                                style="width: 100%; font-size: 11px; display: ${this.filters[col] && this.filters[col] !== '__REMOVE_BLANKS__' && this.filters[col] !== '' ? 'block' : 'none'};">
                                     </div>
@@ -4028,15 +4028,15 @@
                                         </div>
                                     </div>
                                 ` : `
-                                    <input type="text" class="filter-input" placeholder="Filter ${col}" 
+                                    <input type="text" class="filter-input" placeholder="Filter ${col}"
                                            data-column="${col}" value="${this.filters[col] || ''}">
                                 `}
                             </th>
                         `).join('')}
                         <th></th>
                     </tr>
-                ` : '';
-                
+                `;
+
                 tableHead.innerHTML = `
                     <tr class="header-row">${headerRow}</tr>
                     ${filterRow}
@@ -4492,19 +4492,13 @@
             }
 
             toggleFilters() {
-                const wasVisible = this.filtersVisible;
                 this.filtersVisible = !this.filtersVisible;
                 this.saveUserColumnPreferences(); // Save user preferences
 
-                // Instead of recreating the entire table, just show/hide the filter row
-                const filterRow = $('#mainTable thead .filter-row');
-
-                if (this.filtersVisible && filterRow.length === 0) {
-                    // Need to show filters but they don't exist - create table
-                    this.createTable();
-                } else if (filterRow.length > 0) {
-                    // Filter row exists, just toggle visibility for instant response
-                    filterRow.toggle(this.filtersVisible);
+                // Toggle filter row visibility instantly (no table recreation needed)
+                const filterRow = document.querySelector('#mainTable thead .filter-row');
+                if (filterRow) {
+                    filterRow.style.display = this.filtersVisible ? 'table-row' : 'none';
                 }
 
                 const btn = document.getElementById('toggleFiltersBtn');
