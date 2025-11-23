@@ -4496,11 +4496,9 @@
                 this.saveUserColumnPreferences(); // Save user preferences
 
                 // Toggle filter row visibility instantly (no table recreation needed)
-                const filterRow = $('#mainTable thead .filter-row');
-                if (this.filtersVisible) {
-                    filterRow.css('display', 'table-row');
-                } else {
-                    filterRow.css('display', 'none');
+                const filterRow = document.querySelector('#mainTable thead .filter-row');
+                if (filterRow) {
+                    filterRow.style.display = this.filtersVisible ? 'table-row' : 'none';
                 }
 
                 const btn = document.getElementById('toggleFiltersBtn');
