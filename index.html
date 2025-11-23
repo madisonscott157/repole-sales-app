@@ -4240,17 +4240,18 @@
 
                 // Filter input events with debouncing
                 let filterTimeout;
-                $('#mainTable thead').off('input change').on('input change', '.filter-input', (e) => {
+                $('#mainTable thead').off('input change blur').on('input change blur', '.filter-input', (e) => {
                     const column = $(e.target).data('column');
                     const value = e.target.value;
-                    
+                    const eventType = e.type;
+
                     // Special handling for Vet filter
                     if (column === 'Vet') {
                         if ($(e.target).hasClass('vet-filter-select')) {
                             // Dropdown selection
                             if (value === '__CUSTOM__') {
                                 // Show custom input field
-                                $(e.target).siblings('.vet-custom-input').show();
+                                $(e.target).siblings('.vet-custom-input').show().focus();
                                 return; // Don't apply filter yet, wait for custom input
                             } else {
                                 // Hide custom input field
@@ -4268,7 +4269,10 @@
                             // Hip dropdown selection
                             if (value === '__RANGE__') {
                                 // Show range input fields
-                                $(e.target).siblings('div').show();
+                                const rangeDiv = $(e.target).siblings('div');
+                                rangeDiv.show();
+                                // Focus the first input after a short delay to ensure it's visible
+                                setTimeout(() => rangeDiv.find('.hip-range-from').focus(), 50);
                                 return; // Don't apply filter yet, wait for range inputs
                             } else {
                                 // Hide range input fields
@@ -4283,7 +4287,7 @@
                             const fromValue = fromInput.val();
                             const toValue = toInput.val();
 
-                            // Save partial range values (allows typing without losing focus)
+                            // Save filter value immediately without recreating table
                             if (fromValue || toValue) {
                                 this.filters[column] = `${fromValue}-${toValue}`;
                                 // Update dropdown to show Range is selected
@@ -4291,13 +4295,29 @@
                             } else {
                                 this.filters[column] = '';
                             }
+
+                            // Only recreate table on blur or after significant delay
+                            if (eventType === 'blur') {
+                                clearTimeout(filterTimeout);
+                                this.createTable();
+                                this.autoSave();
+                                return;
+                            } else {
+                                // For input events, use longer delay to allow typing
+                                clearTimeout(filterTimeout);
+                                filterTimeout = setTimeout(() => {
+                                    this.createTable();
+                                    this.autoSave();
+                                }, 1500);
+                                return; // Don't recreate table immediately
+                            }
                         }
                     } else {
                         // Regular filter for other columns
                         this.filters[column] = value;
                     }
-                    
-                    // Debounce table recreation
+
+                    // Debounce table recreation for non-hip-range filters
                     clearTimeout(filterTimeout);
                     filterTimeout = setTimeout(() => {
                         this.createTable(); // Refresh table with new filters
@@ -4472,13 +4492,24 @@
             }
 
             toggleFilters() {
+                const wasVisible = this.filtersVisible;
                 this.filtersVisible = !this.filtersVisible;
                 this.saveUserColumnPreferences(); // Save user preferences
-                this.createTable();
-                
+
+                // Instead of recreating the entire table, just show/hide the filter row
+                const filterRow = $('#mainTable thead .filter-row');
+
+                if (this.filtersVisible && filterRow.length === 0) {
+                    // Need to show filters but they don't exist - create table
+                    this.createTable();
+                } else if (filterRow.length > 0) {
+                    // Filter row exists, just toggle visibility for instant response
+                    filterRow.toggle(this.filtersVisible);
+                }
+
                 const btn = document.getElementById('toggleFiltersBtn');
-                btn.innerHTML = this.filtersVisible ? 
-                    '<i class="fas fa-filter"></i> Hide' : 
+                btn.innerHTML = this.filtersVisible ?
+                    '<i class="fas fa-filter"></i> Hide' :
                     '<i class="fas fa-filter"></i> Filters';
             }
 
