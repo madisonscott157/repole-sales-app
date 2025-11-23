@@ -977,8 +977,17 @@
             .delete-horse-btn,
             td:has(.delete-horse-btn),
             .excel-table td:last-child,
-            .excel-table th:last-child {
+            .excel-table th:last-child,
+            .excel-table thead th:last-child,
+            .excel-table tbody td:last-child,
+            .excel-table tr th:last-child,
+            .excel-table tr td:last-child {
                 display: none !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
             }
             
             /* Dynamic column widths using CSS custom properties */
