@@ -4492,19 +4492,30 @@
             }
 
             toggleFilters() {
+                // Toggle the state
                 this.filtersVisible = !this.filtersVisible;
                 this.saveUserColumnPreferences(); // Save user preferences
 
-                // Toggle filter row visibility instantly (no table recreation needed)
-                const filterRow = document.querySelector('#mainTable thead .filter-row');
-                if (filterRow) {
-                    filterRow.style.display = this.filtersVisible ? 'table-row' : 'none';
+                // Update button text immediately
+                const btn = document.getElementById('toggleFiltersBtn');
+                if (btn) {
+                    btn.innerHTML = this.filtersVisible ?
+                        '<i class="fas fa-filter"></i> Hide' :
+                        '<i class="fas fa-filter"></i> Filters';
                 }
 
-                const btn = document.getElementById('toggleFiltersBtn');
-                btn.innerHTML = this.filtersVisible ?
-                    '<i class="fas fa-filter"></i> Hide' :
-                    '<i class="fas fa-filter"></i> Filters';
+                // Find all filter rows (in case there are duplicates) and update them
+                const filterRows = document.querySelectorAll('#mainTable thead .filter-row');
+                if (filterRows.length > 0) {
+                    // Filter row(s) exist, update all of them
+                    filterRows.forEach(row => {
+                        row.style.display = this.filtersVisible ? 'table-row' : 'none';
+                    });
+                } else if (this.combinedData && this.combinedData.length > 0) {
+                    // Filter row doesn't exist but we have data - recreate table with correct filter state
+                    this.createTable();
+                }
+                // If no filter row and no data, do nothing (button state is still updated)
             }
 
             clearAllFilters() {
