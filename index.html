@@ -1944,12 +1944,22 @@
 
             // Save user-specific column preferences
             saveUserColumnPreferences() {
-                const preferences = {
-                    hiddenColumns: Array.from(this.hiddenColumns),
-                    columnOrder: this.columnOrder,
-                    filtersVisible: this.filtersVisible
-                };
-                localStorage.setItem(`repole_columns_${this.userId}`, JSON.stringify(preferences));
+                try {
+                    const preferences = {
+                        hiddenColumns: Array.from(this.hiddenColumns),
+                        columnOrder: this.columnOrder,
+                        filtersVisible: this.filtersVisible
+                    };
+                    localStorage.setItem(`repole_columns_${this.userId}`, JSON.stringify(preferences));
+                } catch (error) {
+                    // Handle quota exceeded or other localStorage errors
+                    if (error.name === 'QuotaExceededError') {
+                        console.warn('localStorage quota exceeded - column preferences not saved');
+                        // Could optionally clear old data here or notify user
+                    } else {
+                        console.error('Failed to save column preferences:', error);
+                    }
+                }
             }
 
             // Load user-specific column preferences
@@ -4494,7 +4504,13 @@
             toggleFilters() {
                 // Toggle the state
                 this.filtersVisible = !this.filtersVisible;
-                this.saveUserColumnPreferences(); // Save user preferences
+
+                // Try to save preferences, but don't let it break the toggle
+                try {
+                    this.saveUserColumnPreferences();
+                } catch (error) {
+                    console.warn('Failed to save filter preference:', error.message);
+                }
 
                 // Update button text immediately
                 const btn = document.getElementById('toggleFiltersBtn');
