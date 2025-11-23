@@ -1895,7 +1895,10 @@
                 // Undo system - completely isolated from other functions
                 this.undoStack = [];
                 this.maxUndoLevels = 10;
-                
+
+                // Lock refresh interval for keeping edit lock alive
+                this.lockRefreshInterval = null;
+
                 this.init();
             }
 
@@ -2118,21 +2121,37 @@
 
             async saveSalesData() {
                 try {
+                    let failedSales = [];
                     for (const [saleId, saleData] of this.salesData.entries()) {
-                        await fetch('https://repole-sales-app.vercel.app/api/sales', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                saleId: saleId,
-                                saleData: saleData
-                            })
-                        });
+                        try {
+                            const response = await fetch('https://repole-sales-app.vercel.app/api/sales', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    saleId: saleId,
+                                    saleData: saleData
+                                })
+                            });
+
+                            if (!response.ok) {
+                                failedSales.push(saleId);
+                            }
+                        } catch (saleError) {
+                            console.error(`Error saving sale ${saleId}:`, saleError);
+                            failedSales.push(saleId);
+                        }
                     }
-                    console.log('Sales data saved to Redis');
+
+                    if (failedSales.length > 0) {
+                        alert(`⚠️ Warning: Failed to save ${failedSales.length} sale(s): ${failedSales.join(', ')}\n\nYour changes may not be saved. Please check your internet connection and try again.`);
+                    } else {
+                        console.log('Sales data saved to Redis');
+                    }
                 } catch (error) {
                     console.error('Error saving sales data:', error);
+                    alert('⚠️ Error: Failed to save data to server. Your changes may be lost. Please check your internet connection.');
                 }
             }
 
@@ -4158,14 +4177,29 @@
                         // Special handling for Hip range filtering
                         if (column === 'Hip' && filterValue.includes('-')) {
                             const [fromStr, toStr] = filterValue.split('-');
-                            const fromValue = parseInt(fromStr);
-                            const toValue = parseInt(toStr);
-                            const hipValue = parseInt(row[column]) || 0;
-                            
-                            if (fromValue && toValue && hipValue) {
-                                return hipValue >= fromValue && hipValue <= toValue;
+                            const fromValue = fromStr ? parseInt(fromStr) : null;
+                            const toValue = toStr ? parseInt(toStr) : null;
+                            const hipValue = parseInt(row[column]);
+
+                            // Skip invalid hip values
+                            if (isNaN(hipValue)) {
+                                return false;
                             }
-                            return false; // Invalid range or hip value
+
+                            // Handle partial ranges
+                            if (fromValue && toValue) {
+                                // Both values: range filter
+                                return hipValue >= fromValue && hipValue <= toValue;
+                            } else if (fromValue) {
+                                // Only from value: >= filter
+                                return hipValue >= fromValue;
+                            } else if (toValue) {
+                                // Only to value: <= filter
+                                return hipValue <= toValue;
+                            }
+
+                            // Neither value: show all
+                            return true;
                         }
                         
                         // Regular text filtering
@@ -4246,17 +4280,16 @@
                             // Hip range inputs
                             const fromInput = $(e.target).closest('div').find('.hip-range-from');
                             const toInput = $(e.target).closest('div').find('.hip-range-to');
-                            const fromValue = parseInt(fromInput.val()) || '';
-                            const toValue = parseInt(toInput.val()) || '';
-                            
-                            if (fromValue && toValue) {
+                            const fromValue = fromInput.val();
+                            const toValue = toInput.val();
+
+                            // Save partial range values (allows typing without losing focus)
+                            if (fromValue || toValue) {
                                 this.filters[column] = `${fromValue}-${toValue}`;
                                 // Update dropdown to show Range is selected
                                 $(e.target).closest('div').siblings('.hip-filter-select').val('__RANGE__');
-                            } else if (!fromValue && !toValue) {
-                                this.filters[column] = '';
                             } else {
-                                return; // Don't apply filter until both values are entered
+                                this.filters[column] = '';
                             }
                         }
                     } else {
@@ -6142,7 +6175,7 @@
                 this.isEditMode = false;
                 document.querySelector('.card').classList.add('view-only-mode');
                 document.querySelector('.card').classList.remove('edit-mode-active');
-                
+
                 const editBtn = document.getElementById('editModeBtn');
                 editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
                 editBtn.className = 'btn btn-primary';
@@ -6150,13 +6183,19 @@
                 editBtn.style.color = '';
                 editBtn.style.borderColor = '';
                 editBtn.title = 'Click to enable editing';
-                
+
                 // Clear any existing timeout
                 if (this.editLockTimeout) {
                     clearTimeout(this.editLockTimeout);
                     this.editLockTimeout = null;
                 }
-                
+
+                // Clear lock refresh interval
+                if (this.lockRefreshInterval) {
+                    clearInterval(this.lockRefreshInterval);
+                    this.lockRefreshInterval = null;
+                }
+
                 // Start view mode auto-refresh
                 this.startViewRefresh();
             }
@@ -6165,7 +6204,7 @@
                 this.isEditMode = true;
                 document.querySelector('.card').classList.remove('view-only-mode');
                 document.querySelector('.card').classList.add('edit-mode-active');
-                
+
                 const editBtn = document.getElementById('editModeBtn');
                 editBtn.innerHTML = '<i class="fas fa-lock"></i> Stop Editing';
                 editBtn.className = 'btn';
@@ -6173,12 +6212,44 @@
                 editBtn.style.color = 'white';
                 editBtn.style.borderColor = '#ff6600';
                 editBtn.title = 'Click to stop editing and release lock';
-                
+
                 // Stop view refresh in edit mode
                 this.stopViewRefresh();
-                
+
                 // Start activity timeout (15 minutes)
                 this.startEditTimeout();
+
+                // Clear any existing lock refresh interval (defensive)
+                if (this.lockRefreshInterval) {
+                    clearInterval(this.lockRefreshInterval);
+                    this.lockRefreshInterval = null;
+                }
+
+                // Start lock refresh heartbeat - refresh every 90 seconds to keep lock alive
+                this.lockRefreshInterval = setInterval(async () => {
+                    // Double-check we're still in edit mode
+                    if (!this.isEditMode || !this.currentSaleId) {
+                        clearInterval(this.lockRefreshInterval);
+                        this.lockRefreshInterval = null;
+                        return;
+                    }
+
+                    try {
+                        await fetch('https://repole-sales-app.vercel.app/api/edit-lock', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'request',
+                                saleId: this.currentSaleId,
+                                userId: this.userId
+                            })
+                        });
+                        console.log('Edit lock refreshed');
+                    } catch (error) {
+                        console.error('Failed to refresh edit lock:', error);
+                        // Don't alert user - they'll find out at timeout if it matters
+                    }
+                }, 90000); // 90 seconds
             }
             
             async requestEditMode() {
