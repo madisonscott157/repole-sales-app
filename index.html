@@ -5071,9 +5071,9 @@
                 // Get dynamic column widths
                 const columnWidths = visibleColumns.map(col => calculateColumnWidth(col));
                 const totalWidth = columnWidths.reduce((sum, width) => sum + width, 0);
-                
-                // Scale to fit page width (A3 landscape = ~1050 points with margins)
-                const maxWidth = 1050;
+
+                // Scale to fit page width (A3 landscape = 1190.55 points total, minus 40 points margins = 1150 points)
+                const maxWidth = 1150;
                 const scaleFactor = Math.min(1, maxWidth / totalWidth);
                 const finalWidths = columnWidths.map(width => Math.floor(width * scaleFactor));
 
