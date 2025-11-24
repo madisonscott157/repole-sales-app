@@ -989,6 +989,17 @@
                 margin: 0 !important;
                 border: none !important;
             }
+
+            /* Hide blank/empty columns completely from print */
+            .excel-table th[data-column=""],
+            .excel-table td[data-column=""] {
+                display: none !important;
+                visibility: hidden !important;
+                width: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: none !important;
+            }
             
             /* Dynamic column widths using CSS custom properties */
             .excel-table th,
@@ -5064,38 +5075,21 @@
                     return Math.min(Math.max(maxLength * 8, 30), 150); // Min 30, max 150 points
                 };
 
-                // Get dynamic column widths
+                // Get dynamic column widths for proportional distribution
                 const columnWidths = visibleColumns.map(col => calculateColumnWidth(col));
                 const totalWidth = columnWidths.reduce((sum, width) => sum + width, 0);
 
-                // Scale to fit page width (A3 landscape = 1190.55 points total, minus 40 points margins = 1150 points)
-                const maxWidth = 1150;
-                const scaleFactor = maxWidth / totalWidth; // Always scale to fill exactly 1150 points
-                const scaledWidths = columnWidths.map(width => width * scaleFactor);
-
-                // Round widths and track the total
-                const finalWidths = scaledWidths.map(width => Math.floor(width));
-                const currentTotal = finalWidths.reduce((sum, width) => sum + width, 0);
-
-                // Distribute any remaining width to ensure we use exactly 1150 points
-                const remaining = maxWidth - currentTotal;
-                if (remaining > 0) {
-                    // Add the remaining width to the largest columns
-                    const sortedIndices = finalWidths
-                        .map((width, index) => ({ width, index }))
-                        .sort((a, b) => b.width - a.width)
-                        .map(item => item.index);
-
-                    for (let i = 0; i < remaining; i++) {
-                        finalWidths[sortedIndices[i % sortedIndices.length]]++;
-                    }
-                }
+                // Use proportional widths with '*' notation - this FORCES columns to fill entire page width
+                // Each column gets a proportion based on its content, guaranteed to sum to 100% of available width
+                const finalWidths = columnWidths.map(width => {
+                    const proportion = width / totalWidth;
+                    return (proportion * 10).toFixed(2) + '*'; // Multiply by 10 for better precision
+                });
 
                 // Debug: Log column info
-                const totalFinalWidth = finalWidths.reduce((sum, width) => sum + width, 0);
                 console.log('PDF Export Debug:');
                 console.log('  Columns:', visibleColumns.length, visibleColumns);
-                console.log('  Total width:', totalFinalWidth, '/ 1150 points');
+                console.log('  Using proportional widths (star notation) to fill entire page');
                 console.log('  Column widths:', finalWidths);
 
                 // Function to wrap text for better display
@@ -5257,14 +5251,23 @@
             addPrintColumnClasses() {
                 const table = document.getElementById('mainTable');
                 if (!table) return;
-                
-                // Get all visible header cells (excluding delete column)
-                const headerCells = Array.from(table.querySelectorAll('thead th')).filter(th => 
-                    !th.querySelector('.delete-horse-btn') && 
-                    th.style.display !== 'none' &&
-                    !th.classList.contains('d-none')
-                );
-                
+
+                // Get ALL header cells first (for accurate nth-child positioning)
+                const allHeaderCells = Array.from(table.querySelectorAll('thead th'));
+
+                // Get all visible header cells (excluding delete column and BLANK columns)
+                const headerCells = allHeaderCells.filter(th => {
+                    // Exclude delete button column
+                    if (th.querySelector('.delete-horse-btn')) return false;
+                    // Exclude hidden columns
+                    if (th.style.display === 'none' || th.classList.contains('d-none')) return false;
+                    // Exclude blank/empty column headers
+                    const headerText = th.textContent.trim();
+                    const columnName = th.getAttribute('data-column');
+                    if (!headerText || headerText === '' || !columnName || columnName.trim() === '') return false;
+                    return true;
+                });
+
                 const totalColumns = headerCells.length;
                 
                 // Define priority column types and their preferred relative sizes
@@ -5292,52 +5295,26 @@
                 
                 headerCells.forEach((th, index) => {
                     const headerText = th.textContent.trim().toLowerCase();
-                    const columnIndex = index + 1;
-                    
+                    // Use ACTUAL DOM position, not filtered array index
+                    const columnIndex = allHeaderCells.indexOf(th) + 1;
+
                     let columnType = null;
                     let preferredSize = 4; // Default for grade/shortlist columns
-                    
-                    // Check if it's a blank column (no header text) or the far right column
-                    if (!headerText || headerText.trim() === '' || index === headerCells.length - 1) {
-                        // Special handling for far right column - always make it small
-                        if (index === headerCells.length - 1 && (!headerText || headerText.trim() === '')) {
-                            columnType = 'blank-right';
-                            preferredSize = 1;
-                        } else if (!headerText || headerText.trim() === '') {
-                            columnType = 'blank';
-                            preferredSize = 1;
-                        } else {
-                            // It's the far right column but has text, process normally
-                            // Identify column type
-                            for (const [type, config] of Object.entries(columnTypes)) {
-                                if (headerText.includes(type)) {
-                                    columnType = type;
-                                    preferredSize = config.preferredSize;
-                                    break;
-                                }
-                            }
-                            
-                            if (!columnType) {
-                                shortlistColumns++;
-                                columnType = 'shortlist';
-                                // Keep preferredSize = 4 for grade columns
-                            }
+
+                    // Identify column type
+                    for (const [type, config] of Object.entries(columnTypes)) {
+                        if (headerText.includes(type)) {
+                            columnType = type;
+                            preferredSize = config.preferredSize;
+                            break;
                         }
-                    } else {
-                        // Identify column type
-                        for (const [type, config] of Object.entries(columnTypes)) {
-                            if (headerText.includes(type)) {
-                                columnType = type;
-                                preferredSize = config.preferredSize;
-                                break;
-                            }
-                        }
-                        
-                        if (!columnType) {
-                            shortlistColumns++;
-                            columnType = 'shortlist';
-                            // Keep preferredSize = 4 for grade columns
-                        }
+                    }
+
+                    // If not identified, it's a shortlist/grade column
+                    if (!columnType) {
+                        shortlistColumns++;
+                        columnType = 'shortlist';
+                        // Keep preferredSize = 4 for grade columns
                     }
                     
                     identifiedColumns.push({
