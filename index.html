@@ -5074,8 +5074,26 @@
 
                 // Scale to fit page width (A3 landscape = 1190.55 points total, minus 40 points margins = 1150 points)
                 const maxWidth = 1150;
-                const scaleFactor = Math.min(1, maxWidth / totalWidth);
-                const finalWidths = columnWidths.map(width => Math.floor(width * scaleFactor));
+                const scaleFactor = maxWidth / totalWidth; // Always scale to fill exactly 1150 points
+                const scaledWidths = columnWidths.map(width => width * scaleFactor);
+
+                // Round widths and track the total
+                const finalWidths = scaledWidths.map(width => Math.floor(width));
+                const currentTotal = finalWidths.reduce((sum, width) => sum + width, 0);
+
+                // Distribute any remaining width to ensure we use exactly 1150 points
+                const remaining = maxWidth - currentTotal;
+                if (remaining > 0) {
+                    // Add the remaining width to the largest columns
+                    const sortedIndices = finalWidths
+                        .map((width, index) => ({ width, index }))
+                        .sort((a, b) => b.width - a.width)
+                        .map(item => item.index);
+
+                    for (let i = 0; i < remaining; i++) {
+                        finalWidths[sortedIndices[i % sortedIndices.length]]++;
+                    }
+                }
 
                 // Function to wrap text for better display
                 const wrapText = (text, maxLength = 25) => {
