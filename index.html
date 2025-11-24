@@ -4945,8 +4945,10 @@
                 const saleInfo = this.currentSaleId ? this.salesData.get(this.currentSaleId) : null;
                 const saleTitle = saleInfo ? saleInfo.saleName : 'Combined Shortlist';
 
-                // Get only visible columns
-                const visibleColumns = this.columnOrder.filter(col => !this.hiddenColumns.has(col));
+                // Get only visible columns - exclude empty/blank column names
+                const visibleColumns = this.columnOrder.filter(col =>
+                    !this.hiddenColumns.has(col) && col && col.trim() !== ''
+                );
                 
                 // Sort data by hip number before export
                 const sortedData = [...this.combinedData].sort((a, b) => {
@@ -5020,8 +5022,10 @@
                 const saleInfo = this.currentSaleId ? this.salesData.get(this.currentSaleId) : null;
                 const saleTitle = saleInfo ? `${saleInfo.saleName} - ${saleInfo.saleDate}` : 'Combined Shortlist';
 
-                // Get only visible columns and data
-                const visibleColumns = this.columnOrder.filter(col => !this.hiddenColumns.has(col));
+                // Get only visible columns and data - exclude empty/blank column names
+                const visibleColumns = this.columnOrder.filter(col =>
+                    !this.hiddenColumns.has(col) && col && col.trim() !== ''
+                );
                 const exportData = this.combinedData.map(row => {
                     const filteredRow = {};
                     visibleColumns.forEach(col => {
@@ -5047,15 +5051,7 @@
                         });
                         return Math.min(Math.max(maxLength * 8 + 20, 60), 180); // Extra space, min 60, max 180
                     }
-                    
-                    // Check if this is the blank column after Result
-                    const visibleColumnIndex = visibleColumns.indexOf(col);
-                    const resultIndex = visibleColumns.indexOf('Result');
-                    if (resultIndex !== -1 && visibleColumnIndex === resultIndex + 1 && (!col || col.trim() === '')) {
-                        // Make blank column much smaller
-                        return 20; // Very small width for blank column
-                    }
-                    
+
                     // Find the longest content in this column
                     let maxLength = col.length; // Start with header length
                     
@@ -5094,6 +5090,13 @@
                         finalWidths[sortedIndices[i % sortedIndices.length]]++;
                     }
                 }
+
+                // Debug: Log column info
+                const totalFinalWidth = finalWidths.reduce((sum, width) => sum + width, 0);
+                console.log('PDF Export Debug:');
+                console.log('  Columns:', visibleColumns.length, visibleColumns);
+                console.log('  Total width:', totalFinalWidth, '/ 1150 points');
+                console.log('  Column widths:', finalWidths);
 
                 // Function to wrap text for better display
                 const wrapText = (text, maxLength = 25) => {
@@ -5168,6 +5171,7 @@
                                 body: tableBody,
                                 dontBreakRows: false
                             },
+                            width: '*', // Force table to use full width
                             layout: {
                                 fillColor: function (rowIndex, node, columnIndex) {
                                     return (rowIndex === 0) ? '#e8e8e8' : ((rowIndex % 2 === 0) ? '#f9f9f9' : null);
