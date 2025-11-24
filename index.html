@@ -847,7 +847,7 @@
                 @bottom-left { content: none; }
                 @bottom-center { content: none; }
                 @bottom-right { content: none; }
-                margin: 0.25in !important;
+                margin: 0.1in !important;
             }
             
             /* Desktop print settings */
@@ -1074,6 +1074,14 @@
                 position: absolute !important;
                 top: 25px !important;
                 left: 0 !important;
+            }
+
+            /* Ensure all container elements use full width */
+            .row, .col-12, .card, .card-body {
+                width: 100% !important;
+                max-width: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
             
             /* Remove ALL hover effects and colors for print */
